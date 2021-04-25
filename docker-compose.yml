@@ -1,0 +1,92 @@
+# --------------------
+# Stack: Nextcloud + Postgres + Redis
+# Docs: https://hub.docker.com/_/nextcloud/#running-this-image-with-docker-compose
+# ------------------------------
+
+version: '3.7'
+
+services:
+  pgsql:
+    image: postgres:12.4-alpine
+    container_name: nextcloud.pgsql
+    restart: always
+    volumes:
+      - ./pgsql:/var/lib/postgresql/data
+    env_file: db.env
+    expose: 5432
+    networks:
+      - d0_nextcloud
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: '4G'
+
+  redis:
+    image: redis:alpine
+    container_name: nextcloud.redis
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: '4G'
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 10
+        window: 15s
+
+  app:
+    image: nextcloud:fpm-alpine
+    container_name: nextcloud.app
+    restart: always
+    environment:
+      - "NEXTCLOUD_TRUSTED_DOMAINS=localhost"
+      - "POSTGRES_HOST=pgsql:5432"
+      - "REDIS_HOST=redis"
+    env_file: app.env
+    depends_on:
+      - pgsql
+      - redis
+    volumes:
+      - ./data:/var/www/html
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: '4G'
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 10
+        window: 15s
+
+  proxy:
+    image: steveltn/https-portal:1
+    container_name: nextcloud.proxy
+    restart: always
+    ports:
+      - ${HOST_PORT}:443
+    environment:
+      DOMAINS: "${HOST_ADDR} -> http://app:80"
+      STAGE: local
+    volumes:
+      - ./portal:/var/lib/https-portal
+    networks:
+      - d0_nextcloud
+    depends_on: app
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: '256M'
+      restart_policy:
+        condition: any
+        delay: 5s
+        max_attempts: 10
+        window: 15s
+
+networks:
+  d0_nextcloud:
+    driver: bridge
