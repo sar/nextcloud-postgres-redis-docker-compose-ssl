@@ -44,8 +44,9 @@ services:
     environment:
       - "NEXTCLOUD_TRUSTED_DOMAINS=localhost"
       - "POSTGRES_HOST=pgsql:5432"
-      - "REDIS_HOST=redis"
-    env_file: app.env
+    env_file: 
+      - app.env
+      - db.env
     depends_on:
       - pgsql
       - redis
